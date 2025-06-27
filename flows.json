@@ -1,0 +1,1443 @@
+[
+    {
+        "id": "d0a97b84ebf4e7a0",
+        "type": "tab",
+        "label": "Flux 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "10be0403e1755058",
+        "type": "mqtt in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "topic": "smartlight/node/data",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "bd0b2425ee08d681",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 230,
+        "y": 300,
+        "wires": [
+            [
+                "4fbe775d38fa33fc"
+            ]
+        ]
+    },
+    {
+        "id": "bf594a5c44ed9783",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "this flow is about managing commands ",
+        "info": "",
+        "x": 270,
+        "y": 2180,
+        "wires": []
+    },
+    {
+        "id": "a8097f7a82ade5f9",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "send feedback",
+        "info": "",
+        "x": 200,
+        "y": 2280,
+        "wires": []
+    },
+    {
+        "id": "acdb0203e93456bc",
+        "type": "websocket out",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "data to app : /ws/node-data-update",
+        "server": "fdd556463a4202d1",
+        "client": "",
+        "x": 520,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "b888ba9a6bb6193a",
+        "type": "http response",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 1070,
+        "y": 1500,
+        "wires": []
+    },
+    {
+        "id": "e93aad75b826e64f",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "database",
+        "x": 660,
+        "y": 1500,
+        "wires": [
+            [
+                "ac8bd9ca7ab6c28b"
+            ]
+        ]
+    },
+    {
+        "id": "f87d235a0df6a5e6",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "read from db",
+        "func": "msg.topic = `\n  SELECT * FROM system\n  ORDER BY lastUpdated DESC\n  LIMIT 1;\n`;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 450,
+        "y": 1500,
+        "wires": [
+            [
+                "e93aad75b826e64f"
+            ]
+        ]
+    },
+    {
+        "id": "ac8bd9ca7ab6c28b",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "formate json",
+        "func": "if (!msg.payload || msg.payload.length === 0) {\n    msg.statusCode = 404;\n    msg.payload = { error: \"No system data found\" };\n    return msg;\n}\n\nmsg.payload = msg.payload[0];  // Return only the latest entry\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 870,
+        "y": 1500,
+        "wires": [
+            [
+                "b888ba9a6bb6193a"
+            ]
+        ]
+    },
+    {
+        "id": "e9551385ef4f94ab",
+        "type": "http in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "url": "/system-data",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 210,
+        "y": 1500,
+        "wires": [
+            [
+                "f87d235a0df6a5e6"
+            ]
+        ]
+    },
+    {
+        "id": "bd46b8e8d788d378",
+        "type": "http response",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 1070,
+        "y": 1600,
+        "wires": []
+    },
+    {
+        "id": "97eb7afd6f4d3b8c",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "database",
+        "x": 660,
+        "y": 1600,
+        "wires": [
+            [
+                "c1e4f5df537691c7"
+            ]
+        ]
+    },
+    {
+        "id": "8047116f4a02b52f",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "read from db",
+        "func": "// Function 1: Prepare SQL for all areas\n\n// No incoming payload needed here; we read *all* areas.\nmsg.topic = `\n  WITH latest_per_node AS (\n    SELECT nd.*\n    FROM node_data AS nd\n    INNER JOIN (\n      SELECT lampId, MAX(timestamp) AS max_ts\n      FROM node_data\n      GROUP BY lampId\n    ) AS sub\n      ON nd.lampId   = sub.lampId\n     AND nd.timestamp = sub.max_ts\n  ),\n  area_avgs AS (\n    SELECT\n      n.area,\n      AVG(lp.temperature)   AS avg_temp,\n      AVG(lp.humidity)      AS avg_humidity,\n      AVG(lp.light_level)   AS avg_light\n    FROM latest_per_node AS lp\n    JOIN nodes            AS n  ON lp.lampId = n.lampId\n    GROUP BY n.area\n  )\n  SELECT\n    a.area       AS area,\n    a.location   AS location,\n    COALESCE(av.avg_temp,    0) AS avg_temp,\n    COALESCE(av.avg_humidity, 0) AS avg_humidity,\n    COALESCE(av.avg_light,    0) AS avg_light\n  FROM areas AS a\n  LEFT JOIN area_avgs AS av\n    ON a.area = av.area\n  ORDER BY a.area;\n`;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 450,
+        "y": 1600,
+        "wires": [
+            [
+                "97eb7afd6f4d3b8c"
+            ]
+        ]
+    },
+    {
+        "id": "c1e4f5df537691c7",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "formate json",
+        "func": "// Function 2: Map each row into your Dart Area JSON\nmsg.payload = msg.payload.map(row => ({\n    // convert numeric area to String\n    area: String(row.area || ''),\n    location: row.location || '',\n    temperature: Math.round(row.avg_temp || 0),\n    humidity: Math.round(row.avg_humidity || 0),\n    light_level: Math.round(row.avg_light || 0)\n}));\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 870,
+        "y": 1600,
+        "wires": [
+            [
+                "bd46b8e8d788d378"
+            ]
+        ]
+    },
+    {
+        "id": "36d39c0d534c9ae8",
+        "type": "http in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "url": "/area-data",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 200,
+        "y": 1600,
+        "wires": [
+            [
+                "8047116f4a02b52f"
+            ]
+        ]
+    },
+    {
+        "id": "682d524d6581caf9",
+        "type": "http response",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 1070,
+        "y": 1700,
+        "wires": []
+    },
+    {
+        "id": "00e10c20530b18aa",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "database",
+        "x": 660,
+        "y": 1700,
+        "wires": [
+            [
+                "abf1d576556b7d65"
+            ]
+        ]
+    },
+    {
+        "id": "730dc5bf4c45dd28",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "read from db",
+        "func": "msg.topic = `\nSELECT n.lampId, n.node, d.brightness, d.motion, d.powerUsage, d.mode, n.area, d.color, d.temperature, d.humidity, d.light_level\nFROM nodes n\nINNER JOIN (\n    SELECT lampId, MAX(timestamp) AS max_timestamp\n    FROM node_data\n    GROUP BY lampId\n) latest ON n.lampId = latest.lampId\nINNER JOIN node_data d ON d.lampId = latest.lampId AND d.timestamp = latest.max_timestamp;\n`;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 450,
+        "y": 1700,
+        "wires": [
+            [
+                "00e10c20530b18aa"
+            ]
+        ]
+    },
+    {
+        "id": "abf1d576556b7d65",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "formate json",
+        "func": "msg.payload = msg.payload.map(row => ({\n    lampId: row.lampId,\n    node: row.node,\n    brightness: parseInt(row.brightness),\n    motion: parseInt(row.motion),\n    area: parseInt(row.area),\n    powerUsage: parseFloat(row.powerUsage),\n    mode: row.mode,\n    lightLevel: parseFloat(row.light_level) ,\n    temperature: parseFloat(row.temperature) ,\n    humidity: parseFloat(row.humidity) ,\n    color: row.color,\n    \n    \n}));\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 870,
+        "y": 1700,
+        "wires": [
+            [
+                "682d524d6581caf9"
+            ]
+        ]
+    },
+    {
+        "id": "aa828ff11b1dc3fe",
+        "type": "http in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "url": "/node-data",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 200,
+        "y": 1700,
+        "wires": [
+            [
+                "730dc5bf4c45dd28"
+            ]
+        ]
+    },
+    {
+        "id": "8bc24f3b9e32a42b",
+        "type": "http response",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 1070,
+        "y": 1800,
+        "wires": []
+    },
+    {
+        "id": "c51a3c400fedbe46",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "database",
+        "x": 660,
+        "y": 1800,
+        "wires": [
+            [
+                "71f69ef0433196d5"
+            ]
+        ]
+    },
+    {
+        "id": "cb4d3e6768f48fe0",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "read from db",
+        "func": "msg.topic = `\n  SELECT nf.code, 'NODE' AS source, nf.lampId AS id, nf.message, nf.timestamp\n  FROM node_failures nf\n  INNER JOIN nodes n ON nf.lampId = n.lampId\n  WHERE nf.fixed = 0\n\n  UNION\n\n  SELECT af.code, 'AREA' AS source, af.area AS id, af.message, af.timestamp\n  FROM area_failures af\n  WHERE af.fixed = 0\n\n  UNION\n\n  SELECT sf.code, 'SYSTEM' AS source, NULL AS id, sf.message, sf.timestamp\n  FROM system_failures sf\n  WHERE sf.fixed = 0\n\n  ORDER BY timestamp DESC\n`;\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 450,
+        "y": 1800,
+        "wires": [
+            [
+                "c51a3c400fedbe46"
+            ]
+        ]
+    },
+    {
+        "id": "71f69ef0433196d5",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "formate json",
+        "func": "msg.payload = msg.payload.map(row => {\n    return {\n        errorCode: row.code,\n        source: row.source,                 // 'NODE', 'AREA', or 'SYSTEM'\n        id: row.id || null,                // lampId, area, or null\n        message: row.message,\n        timestamp: row.timestamp\n    };\n});\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 870,
+        "y": 1800,
+        "wires": [
+            [
+                "8bc24f3b9e32a42b"
+            ]
+        ]
+    },
+    {
+        "id": "588195a7b7404781",
+        "type": "http in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "url": "/failure-data",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 200,
+        "y": 1800,
+        "wires": [
+            [
+                "cb4d3e6768f48fe0"
+            ]
+        ]
+    },
+    {
+        "id": "4f52cb78dae47d44",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "these flows are responsible for initial data sending to app",
+        "info": "",
+        "x": 330,
+        "y": 1440,
+        "wires": []
+    },
+    {
+        "id": "6f8147f2a659b4eb",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "this flow is responsible for updating the node data in the database then checkes if the node existes or not , if it doesnt it adds it and if it does it updates it",
+        "info": "",
+        "x": 640,
+        "y": 260,
+        "wires": []
+    },
+    {
+        "id": "2082e947d4757f06",
+        "type": "mqtt in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "topic": "smartlight/area/data",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "bd0b2425ee08d681",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 230,
+        "y": 580,
+        "wires": [
+            [
+                "67ed822f9d8af1e3"
+            ]
+        ]
+    },
+    {
+        "id": "f2a00866f65b29ba",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "sqlite ",
+        "x": 690,
+        "y": 580,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "67ed822f9d8af1e3",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "update area list",
+        "func": "// 1. Extraction sécurisée des données\nconst payload = msg.payload || {};\nconst data = {\n    area: Number(payload.area) || 0,\n    location: String(payload.location ?? \"\").trim(),\n};\n\n// 2. Validation minimale\nif (!data.area) {\n    node.error(\"Area  invalide: \" + data.area );\n    return null;\n}\nmsg.topic = `\nINSERT INTO areas (area_id,location)\nVALUES (\n    ${data.area},\n    '${data.location.replace(/'/g, \"''\")}'\n)\nON CONFLICT(area) DO UPDATE SET\n    location = excluded.location;\n`;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 480,
+        "y": 580,
+        "wires": [
+            [
+                "f2a00866f65b29ba"
+            ]
+        ]
+    },
+    {
+        "id": "ff933f536f63f1f4",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "this flow is responsible for updating the app's area data",
+        "info": "this flow is activated on recieving a \nmessage on node data topic because a \nchange in node data results in a \nchange in area data as well\nthis flow is composed of a function node\nthat checks on which area was the change\nmade , calculates the new area data \nbased on the data of all nodes in this \narea so it sends a sql query to the DB\nquessting averages of the most recent\ndata of all nodes in this specefic area\nthe second function formates the data\nin the a format accepted by the app\nand finally a websocket out node to update\nthe app data   \n",
+        "x": 340,
+        "y": 440,
+        "wires": []
+    },
+    {
+        "id": "8dea0b42a9bb3c91",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "this flow updates areas table",
+        "info": "",
+        "x": 260,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "4fbe775d38fa33fc",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "update node data",
+        "func": "// 1. Extraction sécurisée des données\nconst payload = msg.payload || {};\nconst data = {\n    lampId: String(payload.lampId ?? \"\").trim(),\n    node: String(payload.node ?? \"\").trim(),\n    area: Number(payload.area) || 0,\n    brightness: Number(payload.brightness) || 0,\n    motion: Number(payload.motion) || 0,\n    powerUsage: Number(payload.powerUsage) || 0,\n    mode: String(payload.mode ?? \"\").trim(),\n    temperature: Number(payload.temperature) || 0.0,\n    humidity: Number(payload.humidity) || 0.0,\n    color: String(payload.color ?? \"\").trim(),\n    lightLevel: Number(payload.lightLevel) || 0.0\n};\n\n// 2. Validation minimale\nif (!data.lampId || data.lampId.length < 3) {\n    node.error(\"lampId invalide: \" + data.lampId);\n    return null;\n}\n\n// 3. Stockage pour l'étape suivante\nflow.set(\"lastNodeData\", data);\n\n// 4. Construction requête SQL sécurisée\nmsg.topic = `\nINSERT INTO node_data (\n    lampId, brightness, motion, powerUsage, mode, \n    temperature, humidity, color, light_level\n) VALUES (\n    '${data.lampId.replace(/'/g, \"''\")}',\n    ${data.brightness},\n    ${data.motion},\n    ${data.powerUsage},\n    '${data.mode.replace(/'/g, \"''\")}',\n    ${data.temperature},\n    ${data.humidity},\n    '${data.color.replace(/'/g, \"''\")}',\n    ${data.lightLevel}\n)`;\n\n// 5. Nettoyage du payload\nmsg.payload = null;\n\n// 6. Logs\nnode.log(\"[1/2] Données préparées: \" + JSON.stringify(data));\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 450,
+        "y": 300,
+        "wires": [
+            [
+                "16688e193ad35508"
+            ]
+        ]
+    },
+    {
+        "id": "16688e193ad35508",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "database 1",
+        "x": 650,
+        "y": 300,
+        "wires": [
+            [
+                "e7de71e39a816deb"
+            ]
+        ]
+    },
+    {
+        "id": "e7de71e39a816deb",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "update node list",
+        "func": "// 1. Récupération des données\nconst data = flow.get(\"lastNodeData\");\nif (!data) {\n    node.error(\"Aucune donnée trouvée dans flow context\");\n    return null;\n}\n\n// 2. Requête SQL optimisée (UPSERT)\nmsg.topic = `\nINSERT OR REPLACE INTO nodes (lampId, node, area)\nSELECT \n    '${data.lampId.replace(/'/g, \"''\")}',\n    '${data.node.replace(/'/g, \"''\")}',\n    ${data.area}\nWHERE EXISTS (SELECT 1 FROM node_data WHERE lampId = '${data.lampId.replace(/'/g, \"''\")}');\n`;\n\n// 3. Logs\nnode.log(\"[2/2] Requête nodes:\"+ msg.topic);\nreturn msg;",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 840,
+        "y": 300,
+        "wires": [
+            [
+                "4eb014281db9eb85"
+            ]
+        ]
+    },
+    {
+        "id": "4eb014281db9eb85",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "database 2",
+        "x": 1030,
+        "y": 300,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "39d847e7834c47ae",
+        "type": "websocket out",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "/ws/area-data-update",
+        "server": "0385f4cedf6b8843",
+        "client": "",
+        "x": 980,
+        "y": 480,
+        "wires": []
+    },
+    {
+        "id": "44d5d873609ce650",
+        "type": "mqtt in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "topic": "smartlight/node/data",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "bd0b2425ee08d681",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 230,
+        "y": 480,
+        "wires": [
+            [
+                "99801ca4296fca8e"
+            ]
+        ]
+    },
+    {
+        "id": "32a7b72a890eb063",
+        "type": "websocket out",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "data to app : /ws/failure-data-update",
+        "server": "454a29ba6489144a",
+        "client": "",
+        "x": 650,
+        "y": 760,
+        "wires": []
+    },
+    {
+        "id": "f27d2990c0ca1bb8",
+        "type": "websocket out",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "data to app : /ws/system-data-update",
+        "server": "239167ac8c2ab26b",
+        "client": "",
+        "x": 1090,
+        "y": 1080,
+        "wires": []
+    },
+    {
+        "id": "21bb8896be48b78a",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "update failures",
+        "func": "let f = msg.payload;  // f comme failure\nlet table = \"\";\nlet query = \"\";\n\nfunction escapeQuotes(str) {\n    return String(str).replace(/'/g, \"''\");\n}\n\nif (f.source === \"NODE\") {\n    table = \"node_failures\";\n    if (f.fixed === false) {\n        query = `INSERT INTO ${table} (lampId, code, message, timestamp, fixed)\n                 VALUES ('${escapeQuotes(f.id)}', '${escapeQuotes(f.errorCode)}', '${escapeQuotes(f.message)}', '${f.timestamp}', 0);`;\n    } else {\n        query = `UPDATE ${table} SET fixed = 1 WHERE lampId = '${escapeQuotes(f.id)}' AND code = '${escapeQuotes(f.errorCode)}';`;\n    }\n} else if (f.source === \"AREA\") {\n    table = \"area_failures\";\n    if (f.fixed === false) {\n        query = `INSERT INTO ${table} (area, code, message, timestamp, fixed)\n                 VALUES (${f.id}, '${escapeQuotes(f.errorCode)}', '${escapeQuotes(f.message)}', '${f.timestamp}', 0);`;\n    } else {\n        query = `UPDATE ${table} SET fixed = 1 WHERE area = ${f.id} AND code = '${escapeQuotes(f.errorCode)}';`;\n    }\n} else if (f.source === \"SYSTEM\") {\n    table = \"system_failures\";\n    if (f.fixed === false) {\n        query = `INSERT INTO ${table} (code, message, timestamp, fixed)\n                 VALUES ('${escapeQuotes(f.errorCode)}', '${escapeQuotes(f.message)}', '${f.timestamp}', 0);`;\n    } else {\n        query = `UPDATE ${table} SET fixed = 1 WHERE code = '${escapeQuotes(f.errorCode)}';`;\n    }\n} else {\n    return null;  // Source inconnue, on ignore\n}\n\nmsg.topic = query;\nnode.log(msg.topic);\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 520,
+        "y": 860,
+        "wires": [
+            [
+                "9feb98ee8987124c"
+            ]
+        ]
+    },
+    {
+        "id": "7aab8b031a8d80f9",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "database6",
+        "x": 1170,
+        "y": 1180,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "ec29ce010cdf6d75",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "update db",
+        "func": "const p = msg.payload;\n\nmsg.topic = `\n  INSERT INTO system (\n    totalAreas,\n    totalNodes,\n    totalFailures,\n    powerUsageKwh,\n    energySavedKwh,\n    co2ReductionKg,\n    lastUpdated\n  ) VALUES (\n    ${p.totalAreas ?? 0},\n    ${p.totalNodes ?? 0},\n    ${p.totalFailures ?? 0},\n    ${p.powerUsageKwh ?? 0.0},\n    ${p.energySavedKwh ?? 0.0},\n    ${p.co2ReductionKg ?? 0.0},\n    '${p.lastUpdated || new Date().toISOString()}'\n  )\n`;\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 1000,
+        "y": 1180,
+        "wires": [
+            [
+                "7aab8b031a8d80f9"
+            ]
+        ]
+    },
+    {
+        "id": "ecf4930c0a4a5089",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "this flow is responsible for updating the app's node data",
+        "info": "",
+        "x": 340,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "7d236fe7e0906958",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "this flow is responsible for updating the app's failure data",
+        "info": "",
+        "x": 350,
+        "y": 720,
+        "wires": []
+    },
+    {
+        "id": "d0ad143298b613e5",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "this flow is responsible for updating the app's system data",
+        "info": "",
+        "x": 370,
+        "y": 1040,
+        "wires": []
+    },
+    {
+        "id": "f8958706b6ff48e2",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "gather system data",
+        "func": "msg.payload = {};\nmsg.topic = `\nWITH latest_node_data AS (\n  SELECT *\n  FROM (\n    SELECT *, ROW_NUMBER() OVER (PARTITION BY lampId ORDER BY timestamp DESC) AS rn\n    FROM node_data\n  ) t\n  WHERE rn = 1\n),\ndistinct_failures AS (\n  SELECT DISTINCT lampId, code FROM node_failures WHERE fixed = 0\n  UNION\n  SELECT DISTINCT area AS lampId, code FROM area_failures WHERE fixed = 0\n  UNION\n  SELECT DISTINCT 'system' AS lampId, code FROM system_failures WHERE fixed = 0\n)\nSELECT 'totalAreas' AS key, COUNT(*) AS value FROM areas\nUNION\nSELECT 'totalNodes', COUNT(*) FROM nodes\nUNION\nSELECT 'totalFailures', COUNT(*) FROM distinct_failures\nUNION\nSELECT 'powerUsageKwh', IFNULL(SUM(powerUsage), 0) FROM latest_node_data\nUNION\nSELECT 'energySavedKwh', IFNULL(SUM(\n  CASE \n    WHEN mode = 'AUTO' THEN 0.3 * powerUsage\n    ELSE 0 \n  END\n), 0) FROM latest_node_data\nUNION\nSELECT 'co2ReductionKg', IFNULL(SUM(\n  CASE \n    WHEN mode = 'AUTO' THEN 0.3 * powerUsage * 0.6\n    ELSE 0 \n  END\n), 0) FROM latest_node_data;\n`;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 470,
+        "y": 1080,
+        "wires": [
+            [
+                "64ba1830eaa3a62b"
+            ]
+        ]
+    },
+    {
+        "id": "a0230e6577f1a091",
+        "type": "mqtt in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "topic": "smartlight/failure/data",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "bd0b2425ee08d681",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 240,
+        "y": 760,
+        "wires": [
+            [
+                "32a7b72a890eb063"
+            ]
+        ]
+    },
+    {
+        "id": "8c84369ebb32cc22",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "formate data",
+        "func": "// Initialisation d'un objet vide avec les champs obligatoires\nlet result = {\n    lastUpdated: new Date().toISOString()\n};\n\n// Le résultat de SQLite est un tableau de lignes [{key, value}, ...]\nif (Array.isArray(msg.payload)) {\n    msg.payload.forEach(row => {\n        if (row.key && row.value !== undefined) {\n            result[row.key] = row.value;\n        }\n    });\n} else {\n    node.error(\"Résultat inattendu : msg.payload n'est pas un tableau\", msg);\n}\n\nmsg.payload = result;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 810,
+        "y": 1080,
+        "wires": [
+            [
+                "f27d2990c0ca1bb8",
+                "ec29ce010cdf6d75"
+            ]
+        ]
+    },
+    {
+        "id": "e5712e4f2c1086bf",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "this flow is responsible for updating the DB's failure data",
+        "info": "",
+        "x": 340,
+        "y": 820,
+        "wires": []
+    },
+    {
+        "id": "64ba1830eaa3a62b",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "sqlite",
+        "x": 650,
+        "y": 1080,
+        "wires": [
+            [
+                "8c84369ebb32cc22"
+            ]
+        ]
+    },
+    {
+        "id": "c6735c80192dc3bf",
+        "type": "mqtt in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "topic": "smartlight/node/data",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "bd0b2425ee08d681",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 250,
+        "y": 1080,
+        "wires": [
+            [
+                "f8958706b6ff48e2"
+            ]
+        ]
+    },
+    {
+        "id": "50fe70a8061eb86b",
+        "type": "mqtt in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "topic": "smartlight/node/data",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "bd0b2425ee08d681",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 230,
+        "y": 200,
+        "wires": [
+            [
+                "acdb0203e93456bc"
+            ]
+        ]
+    },
+    {
+        "id": "3e496e1d55068472",
+        "type": "websocket out",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "server": "a858b4394bb9f980",
+        "client": "",
+        "x": 660,
+        "y": 2320,
+        "wires": []
+    },
+    {
+        "id": "fecb6490b647b541",
+        "type": "mqtt in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "topic": "smartlight/failure/data",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "bd0b2425ee08d681",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 240,
+        "y": 860,
+        "wires": [
+            [
+                "21bb8896be48b78a"
+            ]
+        ]
+    },
+    {
+        "id": "24055a5eedd90d15",
+        "type": "mqtt in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "topic": "smartlight/node/cmd-ack",
+        "qos": "0",
+        "datatype": "json",
+        "broker": "bd0b2425ee08d681",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 230,
+        "y": 2320,
+        "wires": [
+            [
+                "0a2f71393e4d6759"
+            ]
+        ]
+    },
+    {
+        "id": "0a2f71393e4d6759",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "Parse ACK ",
+        "func": "\ntry {\n    const data = JSON.parse(msg.payload);\n\n    if (!data.nodeId || !data.status || !data.timestamp) {\n        node.warn(\"ACK incomplet, ignoré.\");\n        return null;\n    }\n\n    // Formater pour l'app Flutter (classe Ack)\n    msg.payload = {\n        type: 'ack',\n        lampId: data.nodeId,\n        status: data.status,\n        timestamp: data.timestamp\n    };\n\n    return msg;\n} catch (err) {\n    node.error(\"Erreur lors du parsing du JSON ACK\", err);\n    return null;\n}\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 450,
+        "y": 2320,
+        "wires": [
+            [
+                "3e496e1d55068472"
+            ]
+        ]
+    },
+    {
+        "id": "7a758ed5c1843064",
+        "type": "mqtt out",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "topic": "",
+        "qos": "1",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "bd0b2425ee08d681",
+        "x": 710,
+        "y": 2220,
+        "wires": []
+    },
+    {
+        "id": "bb1b147381b000fa",
+        "type": "http in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "url": "/command",
+        "method": "post",
+        "upload": true,
+        "swaggerDoc": "",
+        "x": 200,
+        "y": 2220,
+        "wires": [
+            [
+                "b57fbbc8330d73bf"
+            ]
+        ]
+    },
+    {
+        "id": "99801ca4296fca8e",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "gather area data",
+        "func": "const incoming = msg.payload;\nconst area    = incoming.area;\n\nmsg.topic = `\n  WITH latest_per_node AS (\n    SELECT nd.*\n    FROM node_data AS nd\n    INNER JOIN (\n      SELECT lampId, MAX(timestamp) AS max_ts\n      FROM node_data\n      GROUP BY lampId\n    ) AS sub\n      ON nd.lampId   = sub.lampId\n     AND nd.timestamp = sub.max_ts\n  )\n  SELECT\n    a.area,\n    a.location,\n    AVG(lp.temperature)   AS avg_temp,\n    AVG(lp.humidity)      AS avg_humidity,\n    AVG(lp.light_level)   AS avg_light\n  FROM latest_per_node AS lp\n  JOIN nodes            AS n ON lp.lampId = n.lampId\n  JOIN areas            AS a ON n.area    = a.area\n  WHERE n.area = ${area}\n  GROUP BY a.area;\n`;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 440,
+        "y": 480,
+        "wires": [
+            [
+                "e117c4cd84916710"
+            ]
+        ]
+    },
+    {
+        "id": "e117c4cd84916710",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "sqlite",
+        "x": 610,
+        "y": 480,
+        "wires": [
+            [
+                "d24faff0a996b02a"
+            ]
+        ]
+    },
+    {
+        "id": "d24faff0a996b02a",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "formate data",
+        "func": "const row = (msg.payload && msg.payload[0]) || {};\n\nmsg.payload = {\n    area: String(row.area || ''),\n    location: row.location || '',\n    temperature: Math.round(row.avg_temp || 0),\n    humidity: Math.round(row.avg_humidity || 0),\n    light_level: Math.round(row.avg_light || 0)\n};\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 770,
+        "y": 480,
+        "wires": [
+            [
+                "39d847e7834c47ae"
+            ]
+        ]
+    },
+    {
+        "id": "8599fe4bc4222ca0",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "User login flow",
+        "info": "",
+        "x": 200,
+        "y": 2480,
+        "wires": []
+    },
+    {
+        "id": "eecc4facf2b6fbdf",
+        "type": "http in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "http in POST /login",
+        "url": "/login",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 210,
+        "y": 2540,
+        "wires": [
+            [
+                "2e4c54746013233a"
+            ]
+        ]
+    },
+    {
+        "id": "3c587aa7b382e02e",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "password check",
+        "func": "const bcrypt = global.get('bcrypt');\nconst jwt = global.get('jwt');\n\nconst secret = 'smartlight';\nconst { email, password } = msg.req.body;\n\nif (!msg.payload || msg.payload.length === 0) {\n    msg.statusCode = 401;\n    msg.payload = { error: 'Utilisateur non trouvé (ou email incorrect)' };\n    return msg;\n}\n\nconst user = msg.payload[0];\n\nconst valid = bcrypt.compareSync(password, user.password_hash);\nif (!valid) {\n    msg.statusCode = 401;\n    msg.payload = { error: 'Mot de passe incorrect' };\n    return msg;\n}\n\nconst token = jwt.sign({ userId: user.id, email: user.email, nom: user.nom, prenom: user.prenom, role: user.role }, secret, { expiresIn: '12h' });\nmsg.payload = { token };\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 720,
+        "y": 2540,
+        "wires": [
+            [
+                "343940f7eb42f876"
+            ]
+        ]
+    },
+    {
+        "id": "6d8fcad7d943896d",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "sqlite",
+        "x": 550,
+        "y": 2540,
+        "wires": [
+            [
+                "3c587aa7b382e02e"
+            ]
+        ]
+    },
+    {
+        "id": "343940f7eb42f876",
+        "type": "http response",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "http response",
+        "statusCode": "",
+        "headers": {},
+        "x": 920,
+        "y": 2540,
+        "wires": []
+    },
+    {
+        "id": "2e4c54746013233a",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "get user",
+        "func": "const email = msg.req.body.email;\n\nconst safeEmail = email.replace(/'/g, \"''\"); // escape single quotes\n\nmsg.topic = `SELECT * FROM users WHERE email = '${safeEmail}' AND actif = 1`;\n\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 400,
+        "y": 2540,
+        "wires": [
+            [
+                "6d8fcad7d943896d"
+            ]
+        ]
+    },
+    {
+        "id": "9feb98ee8987124c",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "sqlite",
+        "x": 750,
+        "y": 860,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "5e038922b6b98bc0",
+        "type": "http in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "url": "/system-history",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 210,
+        "y": 1960,
+        "wires": [
+            [
+                "4b810a7a32d9e215"
+            ]
+        ]
+    },
+    {
+        "id": "4b810a7a32d9e215",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "function 1",
+        "func": "msg.topic = `\n  SELECT\n    DATE(lastUpdated) as date,\n    SUM(powerUsageKwh) AS power,\n    SUM(energySavedKwh) AS saved,\n    SUM(co2ReductionKg) AS co2\n  FROM system\n  GROUP BY DATE(lastUpdated)\n  ORDER BY DATE(lastUpdated) DESC\n  LIMIT 30\n`;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 1960,
+        "wires": [
+            [
+                "2f3e4ac1751df22c"
+            ]
+        ]
+    },
+    {
+        "id": "be4d2589b4c662b1",
+        "type": "http response",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 790,
+        "y": 1960,
+        "wires": []
+    },
+    {
+        "id": "07ca4141a888386b",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "this flow is responsible for system data history sending to app",
+        "info": "",
+        "x": 340,
+        "y": 1920,
+        "wires": []
+    },
+    {
+        "id": "2f3e4ac1751df22c",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "database",
+        "x": 620,
+        "y": 1960,
+        "wires": [
+            [
+                "be4d2589b4c662b1"
+            ]
+        ]
+    },
+    {
+        "id": "fcd227af755d3f36",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "Admin command flow for adding , deleting , blocking and unblocking users ",
+        "info": "",
+        "x": 380,
+        "y": 2660,
+        "wires": []
+    },
+    {
+        "id": "b13a9ef54f467a9b",
+        "type": "http in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "url": "/admin-command",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 220,
+        "y": 2720,
+        "wires": [
+            [
+                "1756c3c2e4d2adcf"
+            ]
+        ]
+    },
+    {
+        "id": "67a0415c44111d75",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "function 2",
+        "func": "const bcrypt = global.get('bcrypt');\nconst payload = msg.payload;\n\nconst type = payload.type;\nconst user = payload.user;\n\nfunction escapeString(str) {\n    return str.replace(/'/g, \"''\");\n}\n\n// Vérification des champs de base\nif (!type || !user) {\n    msg.statusCode = 400;\n    msg.payload = { error: \"Requête invalide : type ou user manquant.\" };\n    return [null, msg];\n}\n\nif (type === \"delete\") {\n    msg.topic = `DELETE FROM users WHERE id = ${user.id}`;\n    return [msg, null];\n\n} else if (type === \"block\") {\n    msg.topic = `UPDATE users SET actif = 0 WHERE id = ${user.id}`;\n    return [msg, null];\n\n} else if (type === \"unblock\") {\n    msg.topic = `UPDATE users SET actif = 1 WHERE id = ${user.id}`;\n    return [msg, null];\n    \n} else if (type === \"add\") {\n    const { nom, prenom, email, password, role } = user;\n\n    if (!nom || !prenom || !email || !password || !role) {\n        msg.statusCode = 400;\n        msg.payload = { error: \"Champs requis manquants pour ajout d'utilisateur.\" };\n        return [null, msg];\n    }\n\n    const passwordHash = bcrypt.hashSync(password, 10);\n\n    msg.topic = `\n      INSERT INTO users (email, password_hash, nom, prenom, role, actif)\n      VALUES (\n        '${escapeString(email)}',\n        '${escapeString(passwordHash)}',\n        '${escapeString(nom)}',\n        '${escapeString(prenom)}',\n        '${escapeString(role)}',\n        1\n      )\n    `;\n    return [msg, null];\n\n} else {\n    msg.statusCode = 400;\n    msg.payload = { error: \"Type de commande non reconnu.\" };\n    return [null, msg];\n}\n",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 600,
+        "y": 2720,
+        "wires": [
+            [
+                "9a523f9481e724a7"
+            ],
+            [
+                "6d597c5648e774f6"
+            ]
+        ]
+    },
+    {
+        "id": "6d597c5648e774f6",
+        "type": "http response",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 750,
+        "y": 2760,
+        "wires": []
+    },
+    {
+        "id": "9a523f9481e724a7",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "sqlite",
+        "x": 750,
+        "y": 2660,
+        "wires": [
+            [
+                "b6a78ce236b0ca80"
+            ]
+        ]
+    },
+    {
+        "id": "1756c3c2e4d2adcf",
+        "type": "json",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "property": "payload",
+        "action": "obj",
+        "pretty": false,
+        "x": 430,
+        "y": 2720,
+        "wires": [
+            [
+                "67a0415c44111d75"
+            ]
+        ]
+    },
+    {
+        "id": "7ab5b88ba6a2d71e",
+        "type": "http in",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "url": "/users",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 180,
+        "y": 2900,
+        "wires": [
+            [
+                "ed3f08071fefea97"
+            ]
+        ]
+    },
+    {
+        "id": "ed3f08071fefea97",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "get users from db",
+        "func": "msg.topic = `\n  SELECT id, prenom, nom, email, role, actif\n  FROM users\n  ORDER BY id ASC\n`;\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 410,
+        "y": 2900,
+        "wires": [
+            [
+                "dcf353a5deae05b9"
+            ]
+        ]
+    },
+    {
+        "id": "dcf353a5deae05b9",
+        "type": "sqlite",
+        "z": "d0a97b84ebf4e7a0",
+        "mydb": "96926a6f4546d1d5",
+        "sqlquery": "msg.topic",
+        "sql": "",
+        "name": "sqlite",
+        "x": 630,
+        "y": 2900,
+        "wires": [
+            [
+                "0f9c8a817e425516"
+            ]
+        ]
+    },
+    {
+        "id": "0f9c8a817e425516",
+        "type": "http response",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "http response",
+        "statusCode": "",
+        "headers": {},
+        "x": 840,
+        "y": 2900,
+        "wires": []
+    },
+    {
+        "id": "ae7df5cb266d6cb1",
+        "type": "comment",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "Admin flow for getting the list of users ",
+        "info": "",
+        "x": 270,
+        "y": 2860,
+        "wires": []
+    },
+    {
+        "id": "b6a78ce236b0ca80",
+        "type": "http response",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "",
+        "statusCode": "",
+        "headers": {},
+        "x": 890,
+        "y": 2660,
+        "wires": []
+    },
+    {
+        "id": "b57fbbc8330d73bf",
+        "type": "function",
+        "z": "d0a97b84ebf4e7a0",
+        "name": "send to dynamic mqtt topic",
+        "func": "// Récupérer le champ \"area\"\nconst area = msg.payload.area;\n\nif (!area) {\n    node.error(\"Le champ 'area' est manquant dans la commande.\");\n    return null;\n}\n\n// Construire dynamiquement le topic MQTT\nmsg.topic = `smartlight/area${area}/command`;\n\n// Supprimer le champ area du payload\ndelete msg.payload.area;\n\n// Transmettre le message modifié\nreturn msg;\n",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 480,
+        "y": 2220,
+        "wires": [
+            [
+                "7a758ed5c1843064"
+            ]
+        ]
+    },
+    {
+        "id": "bd0b2425ee08d681",
+        "type": "mqtt-broker",
+        "name": "hivemq broker",
+        "broker": "72a386d03a1c49528fa91187b0de6f77.s1.eu.hivemq.cloud",
+        "port": "8883",
+        "tls": "",
+        "clientid": "",
+        "autoConnect": true,
+        "usetls": true,
+        "protocolVersion": 4,
+        "keepalive": 60,
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthRetain": "false",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closeRetain": "false",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willRetain": "false",
+        "willPayload": "",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "fdd556463a4202d1",
+        "type": "websocket-listener",
+        "path": "/ws/node-data-update",
+        "wholemsg": "false"
+    },
+    {
+        "id": "96926a6f4546d1d5",
+        "type": "sqlitedb",
+        "db": "/home/pc/PFE/DB/lighting.db",
+        "mode": "RWC"
+    },
+    {
+        "id": "0385f4cedf6b8843",
+        "type": "websocket-listener",
+        "path": "/ws/area-data-update",
+        "wholemsg": "false"
+    },
+    {
+        "id": "454a29ba6489144a",
+        "type": "websocket-listener",
+        "path": "/ws/failure-data-update",
+        "wholemsg": "false"
+    },
+    {
+        "id": "239167ac8c2ab26b",
+        "type": "websocket-listener",
+        "path": "/ws/system-data-update",
+        "wholemsg": "false"
+    },
+    {
+        "id": "a858b4394bb9f980",
+        "type": "websocket-listener",
+        "path": "/ws/command-ack",
+        "wholemsg": "false"
+    }
+]
